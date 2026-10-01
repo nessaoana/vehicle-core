@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class Vehicle(BaseModel):
-    """Represents a business vehicle without persistence concerns."""
+    """Representa um veículo de negócio sem preocupações de persistência."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 

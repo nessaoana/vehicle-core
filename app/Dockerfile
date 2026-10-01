@@ -6,11 +6,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY src/requirements.txt /app/src/requirements.txt
+COPY app/src/requirements.txt /app/src/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r /app/src/requirements.txt
 
-COPY src /app/src
+COPY app/src /app/src
 
 EXPOSE 8000
 

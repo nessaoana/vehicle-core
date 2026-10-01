@@ -1,0 +1,43 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+  pull-requests: write
+
+jobs:
+  docker:
+    uses: fiap-soat-grupo36/reusable-actions/.github/workflows/_reusable-dockerhub.yml@main
+    with:
+      modules: '["app"]'
+      dockerfile_pattern: "./{module}/Dockerfile"
+      registry_namespace: ${{ vars.DOCKERHUB_USERNAME }}
+      tag_strategy: "both"
+      push_images: true
+      exclude_modules: "[]"
+    secrets:
+      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  terraform:
+    needs: docker
+    uses: fiap-soat-grupo36/reusable-actions/.github/workflows/_reusable-terraform.yml@main
+    with:
+      workspace: vehicle-core
+      environment: localstack
+      working_directory: ./infra
+      backend_bucket: vehicle-core-terraform-state
+      auto_apply: true
+      localstack_pod: "vehicle-project"
+      terraform_vars: >-
+        {
+          "localstack_endpoint": "http://localhost:4566",
+          "aws_region": "us-east-1",
+          "assets_bucket_name": "vehicle-core-assets"
+        }
+    secrets:
+      LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
