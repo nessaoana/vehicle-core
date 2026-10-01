@@ -53,9 +53,7 @@ jobs:
       sonar_project_key: "nessaoana_vehicle-core"
       coverage_paths: "coverage.xml"
       run_tests: true
-      sonar_extra_properties: |
-        -Dsonar.python.version=3.10
-        -Dsonar.exclusions=**/__pycache__/**,**/tests/**
+      sonar_extra_properties: "-Dsonar.python.version=3.10 -Dsonar.tests=tests -Dsonar.exclusions=**/__pycache__/**,**/tests/**"
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
@@ -75,8 +73,27 @@ jobs:
         working-directory: infra
         run: terraform validate
 
+  terraform-plan:
+    needs: infrastructure
+    uses: fiap-soat-grupo36/reusable-actions/.github/workflows/_reusable-terraform.yml@main
+    with:
+      workspace: vehicle-core
+      environment: localstack
+      working_directory: ./infra
+      backend_bucket: vehicle-core-terraform-state
+      auto_apply: false
+      localstack_pod: "vehicle-project"
+      terraform_vars: >-
+        {
+          "localstack_endpoint": "http://localhost:4566",
+          "aws_region": "us-east-1",
+          "assets_bucket_name": "vehicle-core-assets"
+        }
+    secrets:
+      LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
+
   create-pr:
-    needs: [build, coverage-gate, sonar, infrastructure]
+    needs: [build, coverage-gate, sonar, infrastructure, terraform-plan]
     if: ${{ github.event_name == 'push' && github.ref != 'refs/heads/main' }}
     uses: fiap-soat-grupo36/reusable-actions/.github/workflows/_reusable-create-pr.yml@main
     with:
