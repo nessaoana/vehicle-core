@@ -268,3 +268,4 @@ terraform.rc
 *.tfplan
 /volume/logs/*
 /volume/*
+vehicle-sales.code-workspace

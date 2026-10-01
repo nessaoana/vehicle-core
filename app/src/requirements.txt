@@ -7,4 +7,3 @@ psycopg2-binary
 pydantic-settings
 dependency-injector
 python-json-logger
-ddtrace
