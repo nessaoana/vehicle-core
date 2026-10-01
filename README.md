@@ -35,7 +35,7 @@ O job de análise usa
 e executa no SonarCloud. Configure `SONAR_TOKEN` como secret e `SONAR_ORG` como
 repository variable.
 
-Em pushes para `main`, o workflow de CD usa
+Após a conclusão bem-sucedida do workflow `CI` na branch `main`, o workflow de CD usa
 `fiap-soat-grupo36/reusable-actions/.github/workflows/_reusable-dockerhub.yml`
 para publicar a imagem `app` no Docker Hub. Configure `DOCKERHUB_USERNAME` e
 `DOCKERHUB_TOKEN` no GitHub. Use `DOCKERHUB_USERNAME` como repository variable
