@@ -33,7 +33,10 @@ Como esse workflow não aplica um limite mínimo de cobertura, o job
 O job de análise usa
 `fiap-soat-grupo36/reusable-actions/.github/workflows/_reusable-sonar-python.yml`
 e executa no SonarCloud. Configure `SONAR_TOKEN` como secret e `SONAR_ORG` como
-repository variable.
+repository variable. Para comentar e publicar o quality gate nos PRs para
+`main`, o projeto `nessaoana_vehicle-core` precisa estar vinculado ao
+repositório GitHub `nessaoana/vehicle-core` no SonarCloud, com a integração do
+GitHub habilitada. O workflow possui `checks: write` e `pull-requests: write`.
 
 Após a conclusão bem-sucedida do workflow `CI` na branch `main`, o workflow de CD usa
 `fiap-soat-grupo36/reusable-actions/.github/workflows/_reusable-dockerhub.yml`
