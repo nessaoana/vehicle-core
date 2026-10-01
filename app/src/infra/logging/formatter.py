@@ -2,11 +2,10 @@
 
 import logging
 
-from ddtrace import tracer
 from pythonjsonlogger import jsonlogger
 
 
-class DatadogJsonFormatter(jsonlogger.JsonFormatter):
+class JsonLogFormatter(jsonlogger.JsonFormatter):
     """Adiciona metadados do serviço e do trace aos registros JSON."""
 
     def __init__(self, service_name: str, environment: str) -> None:
@@ -20,13 +19,7 @@ class DatadogJsonFormatter(jsonlogger.JsonFormatter):
         log_record["environment"] = self.environment
         log_record["level"] = record.levelname
 
-        span = tracer.current_span()
-        if span is not None:
-            log_record["dd.trace_id"] = span.trace_id
-            log_record["dd.span_id"] = span.span_id
-
-
-class DatadogLogConfig:
+class LogConfig:
     """Cria o logger da aplicação com saída JSON."""
 
     def __init__(self, service_name: str, environment: str) -> None:
@@ -42,7 +35,7 @@ class DatadogLogConfig:
         if not logger.handlers:
             handler = logging.StreamHandler()
             handler.setFormatter(
-                DatadogJsonFormatter(self.service_name, self.environment)
+                JsonLogFormatter(self.service_name, self.environment)
             )
             logger.addHandler(handler)
 
