@@ -1,4 +1,4 @@
-"""Application settings loaded from environment variables."""
+"""Configurações da aplicação carregadas das variáveis de ambiente."""
 
 from pathlib import Path
 
@@ -9,7 +9,7 @@ DEFAULT_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 
 
 class Settings(BaseSettings):
-    """Central application configuration."""
+    """Configuração central da aplicação."""
 
     DATABASE_URL: str
     POSTGRES_DB: str = "vehicle_core"

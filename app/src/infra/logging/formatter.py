@@ -1,4 +1,4 @@
-"""Structured logging configuration for the application."""
+"""Configuração de logging estruturado da aplicação."""
 
 import logging
 
@@ -7,7 +7,7 @@ from pythonjsonlogger import jsonlogger
 
 
 class DatadogJsonFormatter(jsonlogger.JsonFormatter):
-    """Adds service and trace metadata to JSON log records."""
+    """Adiciona metadados do serviço e do trace aos registros JSON."""
 
     def __init__(self, service_name: str, environment: str) -> None:
         super().__init__()
@@ -27,7 +27,7 @@ class DatadogJsonFormatter(jsonlogger.JsonFormatter):
 
 
 class DatadogLogConfig:
-    """Creates the application logger with JSON output."""
+    """Cria o logger da aplicação com saída JSON."""
 
     def __init__(self, service_name: str, environment: str) -> None:
         self.service_name = service_name
@@ -50,5 +50,5 @@ class DatadogLogConfig:
         return logger
 
     def get_logger(self) -> logging.Logger:
-        """Returns the configured logger, creating it on first use."""
+        """Retorna o logger configurado, criando-o no primeiro uso."""
         return self.logger or self.configure()
