@@ -2,6 +2,7 @@ fastapi>=0.100.0
 uvicorn
 pytest
 pytest-cov
+httpx2
 sqlalchemy
 psycopg2-binary
 pydantic-settings

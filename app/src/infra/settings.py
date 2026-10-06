@@ -11,7 +11,7 @@ DEFAULT_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 class Settings(BaseSettings):
     """Configuração central da aplicação."""
 
-    DATABASE_URL: str
+    DATABASE_URL: str = "sqlite:///./vehicle-core.db"
     POSTGRES_DB: str = "vehicle_core"
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = ""

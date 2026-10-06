@@ -1,4 +1,5 @@
 from pydantic import ValidationError
+from decimal import Decimal
 import pytest
 
 from src.domain.entitites.vehicle import Vehicle
@@ -11,6 +12,7 @@ def test_vehicle_uses_documented_defaults() -> None:
     assert vehicle.license_plate == ""
     assert vehicle.status == "available"
     assert vehicle.active is True
+    assert vehicle.price == Decimal("0.00")
 
 
 def test_vehicle_serializes_its_fields() -> None:
@@ -19,6 +21,7 @@ def test_vehicle_serializes_its_fields() -> None:
         brand="Toyota",
         model="Corolla",
         year=2024,
+        price=Decimal("75000.00"),
         color="Black",
         notes="Single owner",
         status="available",
@@ -31,6 +34,7 @@ def test_vehicle_serializes_its_fields() -> None:
         "brand": "Toyota",
         "model": "Corolla",
         "year": 2024,
+        "price": Decimal("75000.00"),
         "color": "Black",
         "notes": "Single owner",
         "status": "available",
