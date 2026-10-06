@@ -1,3 +1,5 @@
+[![Quality gate status](https://sonarcloud.io/api/project_badges/measure?project=nessaoana_vehicle-core&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=nessaoana_vehicle-core)
+
 # vehicle-core
 
 Serviço principal para cadastro de veículos e operações de negócio. A imagem da
