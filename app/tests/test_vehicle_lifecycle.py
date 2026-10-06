@@ -85,5 +85,8 @@ def test_change_availability_marks_vehicle_as_sold() -> None:
 
 
 def test_get_vehicle_rejects_unknown_id() -> None:
+    repository = InMemoryVehicleRepository()
+    use_case = GetVehicleUseCase(repository)
+
     with pytest.raises(VehicleNotFoundError):
-        GetVehicleUseCase(InMemoryVehicleRepository()).execute(99)
+        use_case.execute(99)

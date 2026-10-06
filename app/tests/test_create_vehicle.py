@@ -58,6 +58,7 @@ def test_create_vehicle_rejects_duplicate_plate() -> None:
             color="Black",
         )
     )
+    duplicate_input = vehicle_input("abc1d23")
 
     with pytest.raises(VehicleAlreadyExistsError):
-        use_case.execute(vehicle_input("abc1d23"))
+        use_case.execute(duplicate_input)

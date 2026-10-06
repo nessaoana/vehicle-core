@@ -38,26 +38,30 @@ def test_factory_accepts_brazilian_license_plate_formats(license_plate: str) -> 
 
 
 def test_factory_rejects_invalid_license_plate() -> None:
+    price = Decimal("75000.00")
+
     with pytest.raises(ValueError, match="Brazilian format"):
         VehicleFactory.create(
             license_plate="INVALID",
             brand=None,
             model="Corolla",
             year=2024,
-            price=Decimal("75000.00"),
+            price=price,
             color=None,
             notes=None,
         )
 
 
 def test_factory_rejects_invalid_registration_data() -> None:
+    price = Decimal("75000.00")
+
     with pytest.raises(ValueError, match="model"):
         VehicleFactory.create(
             license_plate="ABC1D23",
             brand=None,
             model=" ",
             year=2024,
-            price=Decimal("75000.00"),
+            price=price,
             color=None,
             notes=None,
         )

@@ -72,27 +72,40 @@ def test_sqlalchemy_repository_updates_and_changes_availability() -> None:
 
 def test_sqlalchemy_repository_rejects_missing_entities() -> None:
     repository, _, vehicle_id = repository_with_vehicle()
+    missing_vehicle = Vehicle(
+        id=999,
+        license_plate="ZZZ1A23",
+        model="Ka",
+        year=2020,
+        price=Decimal("1000"),
+    )
+    vehicle_without_id = Vehicle(
+        license_plate="ZZZ1A23",
+        model="Ka",
+        year=2020,
+        price=Decimal("1000"),
+    )
 
     assert repository.find_by_id(999) is None
     with pytest.raises(VehicleNotFoundError):
-        repository.update(Vehicle(id=999, license_plate="ZZZ1A23", model="Ka", year=2020, price=Decimal("1000")))
+        repository.update(missing_vehicle)
     with pytest.raises(VehicleNotFoundError):
         repository.set_availability(999, status="sold", active=False)
     with pytest.raises(VehicleNotFoundError):
-        repository.update(Vehicle(license_plate="ZZZ1A23", model="Ka", year=2020, price=Decimal("1000")))
+        repository.update(vehicle_without_id)
 
 
 def test_sqlalchemy_repository_rejects_duplicate_plate() -> None:
     repository, _, _ = repository_with_vehicle()
+    duplicate_vehicle = VehicleFactory.create(
+        license_plate="ABC1D23",
+        brand=None,
+        model="Fiesta",
+        year=2022,
+        price=Decimal("50000.00"),
+        color=None,
+        notes=None,
+    )
+
     with pytest.raises(VehicleAlreadyExistsError):
-        repository.create(
-            VehicleFactory.create(
-                license_plate="ABC1D23",
-                brand=None,
-                model="Fiesta",
-                year=2022,
-                price=Decimal("50000.00"),
-                color=None,
-                notes=None,
-            )
-        )
+        repository.create(duplicate_vehicle)
