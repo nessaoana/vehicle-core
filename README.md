@@ -11,7 +11,7 @@ Crie os arquivos de ambiente locais a partir de `.env.example` e execute:
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r app/src/requirements.txt
-PYTHONPATH=app/src .venv/bin/pytest app/tests --cov=app/src --cov-report=term-missing --cov-fail-under=80
+PYTHONPATH=app .venv/bin/pytest app/tests --cov=app/src --cov-report=term-missing --cov-fail-under=80
 docker compose up --build
 ```
 

@@ -1,0 +1,36 @@
+"""Factories for creating valid vehicle aggregates."""
+
+from src.domain.entitites.vehicle import Vehicle
+
+
+class VehicleFactory:
+    """Create vehicles with the defaults required for a new registration."""
+
+    @staticmethod
+    def create(
+        *,
+        license_plate: str,
+        brand: str | None,
+        model: str,
+        year: int,
+        color: str | None,
+        notes: str | None,
+    ) -> Vehicle:
+        normalized_plate = license_plate.strip().upper()
+        normalized_model = model.strip()
+
+        if not normalized_plate:
+            raise ValueError("License plate is required")
+        if not normalized_model:
+            raise ValueError("Vehicle model is required")
+        if year < 1886 or year > 2100:
+            raise ValueError("Vehicle year must be between 1886 and 2100")
+
+        return Vehicle(
+            license_plate=normalized_plate,
+            brand=brand.strip() if brand else None,
+            model=normalized_model,
+            year=year,
+            color=color.strip() if color else None,
+            notes=notes.strip() if notes else None,
+        )
