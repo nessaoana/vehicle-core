@@ -1,6 +1,7 @@
 """Use case for registering a vehicle."""
 
 from dataclasses import dataclass
+from decimal import Decimal
 import logging
 
 from src.application.exceptions.vehicle_exceptions import VehicleAlreadyExistsError
@@ -20,6 +21,7 @@ class CreateVehicleInput:
     brand: str | None
     model: str
     year: int
+    price: Decimal
     color: str | None
     notes: str | None
 
@@ -40,6 +42,7 @@ class CreateVehicleUseCase:
             brand=data.brand,
             model=data.model,
             year=data.year,
+            price=data.price,
             color=data.color,
             notes=data.notes,
         )

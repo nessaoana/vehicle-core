@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from src.application.exceptions.vehicle_exceptions import (
     VehicleAlreadyExistsError,
     VehicleCreationError,
+    VehicleNotFoundError,
 )
 from src.domain.entitites.vehicle import Vehicle
 from src.infra.database.mappers.vehicle_mapper import VehicleMapper
@@ -61,3 +62,36 @@ class SqlAlchemyVehicleRepository:
                 extra={"vehicle_id": created_vehicle.id},
             )
             return created_vehicle
+
+    def find_by_id(self, vehicle_id: int) -> Vehicle | None:
+        with self._session_factory() as session:
+            model = session.get(VehicleModel, vehicle_id)
+            return VehicleMapper.to_entity(model) if model else None
+
+    def update(self, vehicle: Vehicle) -> Vehicle:
+        if vehicle.id is None:
+            raise VehicleNotFoundError("Vehicle ID is required for update")
+        with self._session_factory() as session:
+            model = session.get(VehicleModel, vehicle.id)
+            if model is None:
+                raise VehicleNotFoundError(vehicle.id)
+            for field, value in vehicle.model_dump(exclude={"id"}).items():
+                setattr(model, field, value)
+            try:
+                session.commit()
+            except IntegrityError as error:
+                session.rollback()
+                raise VehicleAlreadyExistsError(vehicle.license_plate) from error
+            session.refresh(model)
+            return VehicleMapper.to_entity(model)
+
+    def set_availability(self, vehicle_id: int, *, status: str, active: bool) -> Vehicle:
+        with self._session_factory() as session:
+            model = session.get(VehicleModel, vehicle_id)
+            if model is None:
+                raise VehicleNotFoundError(vehicle_id)
+            model.status = status
+            model.active = active
+            session.commit()
+            session.refresh(model)
+            return VehicleMapper.to_entity(model)

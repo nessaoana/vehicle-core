@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -18,6 +20,7 @@ def test_sqlalchemy_repository_persists_and_reads_vehicle() -> None:
         brand="Toyota",
         model="Corolla",
         year=2024,
+        price=Decimal("75000.00"),
         color="Black",
         notes=None,
     )

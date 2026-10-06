@@ -1,4 +1,5 @@
 import pytest
+from decimal import Decimal
 
 from src.application.exceptions.vehicle_exceptions import VehicleAlreadyExistsError
 from src.application.use_case.create_vehicle import CreateVehicleInput, CreateVehicleUseCase
@@ -27,6 +28,7 @@ def vehicle_input(license_plate: str = "ABC1D23") -> CreateVehicleInput:
         brand="Toyota",
         model="Corolla",
         year=2024,
+        price=Decimal("75000.00"),
         color="Black",
         notes=None,
     )

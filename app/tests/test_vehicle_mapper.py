@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from src.domain.factories.vehicle_factory import VehicleFactory
 from src.infra.database.mappers.vehicle_mapper import VehicleMapper
 
@@ -8,6 +10,7 @@ def test_vehicle_mapper_converts_domain_entity_to_model_and_back() -> None:
         brand="Toyota",
         model="Corolla",
         year=2024,
+        price=Decimal("75000.00"),
         color="Black",
         notes="One owner",
     )

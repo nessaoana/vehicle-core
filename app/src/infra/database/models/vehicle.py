@@ -1,6 +1,6 @@
 """SQLAlchemy model for vehicles."""
 
-from sqlalchemy import Boolean, Integer, String, Text
+from sqlalchemy import Boolean, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.infra.database.base import Base
@@ -16,6 +16,7 @@ class VehicleModel(Base):
     brand: Mapped[str | None] = mapped_column(String(80), nullable=True)
     model: Mapped[str] = mapped_column(String(80))
     year: Mapped[int] = mapped_column(Integer)
+    price: Mapped[float] = mapped_column(Numeric(12, 2))
     color: Mapped[str | None] = mapped_column(String(40), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="available")

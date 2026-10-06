@@ -2,15 +2,18 @@
 
 from collections.abc import Callable
 from contextlib import asynccontextmanager
-import logging
 
 from fastapi import FastAPI
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from src.adapters.controllers.vehicle_controller import create_vehicle_router
 from src.application.interfaces.vehicle_repository import VehicleRepository
+from src.application.use_case.change_vehicle_availability import ChangeVehicleAvailabilityUseCase
 from src.application.use_case.create_vehicle import CreateVehicleUseCase
+from src.application.use_case.get_vehicle import GetVehicleUseCase
+from src.application.use_case.update_vehicle import UpdateVehicleUseCase
 from src.infra.database.base import Base
 from src.infra.database.models import vehicle as _vehicle_model  # noqa: F401
 from src.infra.database.repositories.vehicle_repository import (
@@ -38,11 +41,45 @@ def create_app(repository: VehicleRepository | None = None) -> FastAPI:
         @asynccontextmanager
         async def lifespan(_: FastAPI):
             Base.metadata.create_all(engine)
+            if "vehicles" in inspect(engine).get_table_names():
+                columns = {column["name"] for column in inspect(engine).get_columns("vehicles")}
+                if "price" not in columns:
+                    with engine.begin() as connection:
+                        connection.execute(
+                            text(
+                                "ALTER TABLE vehicles ADD COLUMN price "
+                                "NUMERIC(12, 2) NOT NULL DEFAULT 0"
+                            )
+                        )
             logger.info("database_schema_ready")
             yield
 
     app = FastAPI(title="vehicle-core", lifespan=lifespan)
-    app.include_router(create_vehicle_router(CreateVehicleUseCase(repository)))
+
+    @app.get("/health", tags=["health"])
+    def health() -> dict[str, str]:
+        return {"status": "ok"}
+
+    @app.get("/health/ready", tags=["health"])
+    def readiness() -> dict[str, str]:
+        if session_factory is None:
+            return {"status": "ok", "database": "not_configured"}
+        try:
+            with session_factory() as session:
+                session.connection()
+        except SQLAlchemyError as error:
+            logger.warning("database_readiness_failed", extra={"error": str(error)})
+            return {"status": "unavailable", "database": "unavailable"}
+        return {"status": "ok", "database": "ok"}
+
+    app.include_router(
+        create_vehicle_router(
+            CreateVehicleUseCase(repository),
+            GetVehicleUseCase(repository),
+            UpdateVehicleUseCase(repository),
+            ChangeVehicleAvailabilityUseCase(repository),
+        )
+    )
     return app
 
 
