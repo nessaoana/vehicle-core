@@ -47,7 +47,17 @@ def test_create_vehicle_uses_factory_and_repository() -> None:
 def test_create_vehicle_rejects_duplicate_plate() -> None:
     repository = InMemoryVehicleRepository()
     use_case = CreateVehicleUseCase(repository)
-    use_case.execute(vehicle_input())
+    repository.vehicles.append(
+        Vehicle(
+            id=1,
+            license_plate="ABC1D23",
+            brand="Toyota",
+            model="Corolla",
+            year=2024,
+            price=Decimal("75000.00"),
+            color="Black",
+        )
+    )
 
     with pytest.raises(VehicleAlreadyExistsError):
         use_case.execute(vehicle_input("abc1d23"))

@@ -42,7 +42,7 @@ def create_vehicle_router(
 
     router = APIRouter(prefix="/vehicles", tags=["vehicles"])
 
-    @router.post("", response_model=VehicleResponse, status_code=status.HTTP_201_CREATED)
+    @router.post("", status_code=status.HTTP_201_CREATED)
     def create_vehicle(payload: VehicleCreateRequest) -> VehicleResponse:
         try:
             vehicle = create_use_case.execute(
@@ -82,14 +82,14 @@ def create_vehicle_router(
         )
         return response
 
-    @router.get("/{vehicle_id}", response_model=VehicleResponse)
+    @router.get("/{vehicle_id}")
     def get_vehicle(vehicle_id: int) -> VehicleResponse:
         try:
             return VehicleResponse.model_validate(get_use_case.execute(vehicle_id))
         except VehicleNotFoundError as error:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=VEHICLE_NOT_FOUND_DETAIL) from error
 
-    @router.patch("/{vehicle_id}", response_model=VehicleResponse)
+    @router.patch("/{vehicle_id}")
     def update_vehicle(vehicle_id: int, payload: VehicleUpdateRequest) -> VehicleResponse:
         try:
             vehicle = update_use_case.execute(
@@ -104,7 +104,7 @@ def create_vehicle_router(
         except ValueError as error:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
 
-    @router.patch("/{vehicle_id}/availability", response_model=VehicleResponse, tags=["internal"])
+    @router.patch("/{vehicle_id}/availability", tags=["internal"])
     def change_availability(vehicle_id: int, payload: VehicleAvailabilityRequest) -> VehicleResponse:
         try:
             vehicle = availability_use_case.execute(
