@@ -269,3 +269,4 @@ terraform.rc
 /volume/logs/*
 /volume/*
 vehicle-sales.code-workspace
+/.github/workflows/*.code-workspace

@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: app/Dockerfile
+    image: vehicle-core-api
     container_name: vehicle-core-api
     ports:
       - "8001:8000"
