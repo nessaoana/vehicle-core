@@ -16,8 +16,7 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     uses: fiap-soat-grupo36/reusable-actions/.github/workflows/_reusable-dockerhub.yml@main
     with:
-      modules: '["app"]'
-      dockerfile_pattern: "./{module}/Dockerfile"
+      services_json: '[{"service":"vehicle-core","dockerfile":"./app/Dockerfile"}]'
       registry_namespace: ${{ vars.DOCKERHUB_USERNAME }}
       tag_strategy: "both"
       push_images: true
