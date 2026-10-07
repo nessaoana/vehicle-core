@@ -1,4 +1,4 @@
-[![Quality gate status](https://sonarcloud.io/api/project_badges/measure?project=nessaoana_vehicle-core&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=nessaoana_vehicle-core)
+[![Quality gate status](https://sonarcloud.io/api/project_badges/measure?project=nessaoana_vehicle-core&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=nessaoana_vehicle-core) [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=nessaoana_vehicle-core&metric=coverage)](https://sonarcloud.io/summary/new_code?id=nessaoana_vehicle-core)
 
 # vehicle-core
 
