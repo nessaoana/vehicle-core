@@ -133,41 +133,29 @@ GET /health/ready # processo e banco disponíveis
 
 ## CI/CD
 
-O workflow de CI é executado em pull requests e pushes para `main`. Ele instala
-as dependências, compila o código Python e bloqueia alterações quando a
-cobertura dos testes fica abaixo de 80%. O mesmo workflow executa a análise
-SonarQube e bloqueia a alteração quando o quality gate configurado falha.
+```mermaid
+flowchart LR
+	Push[Push ou PR] --> Tests[Build e testes<br/>cobertura ≥ 80%] --> Sonar[SonarCloud]
+	Push --> Plan[Terraform<br/>validate + plan]
+	Sonar --> Branch{Branch?}
+	Plan --> Branch
+	Branch -- outra --> PR[Abre PR para main]
+	Branch -- main --> Docker[Publica imagem<br/>no Docker Hub] --> Apply[Terraform apply<br/>no LocalStack]
+```
 
-O build Python usa o workflow reutilizável
-`fiap-soat-grupo36/reusable-actions/.github/workflows/_reusable-build-python.yml`.
-Como esse workflow não aplica um limite mínimo de cobertura, o job
-`coverage-gate` executa a verificação adicional de 80%.
+O CI roda em pushes para qualquer branch e em PRs para `main`:
 
-O job de análise usa
-`fiap-soat-grupo36/reusable-actions/.github/workflows/_reusable-sonar-python.yml`
-e executa no SonarCloud. Configure `SONAR_TOKEN` como secret e `SONAR_ORG` como
-repository variable. Para comentar e publicar o quality gate nos PRs para
-`main`, o projeto `nessaoana_vehicle-core` precisa estar vinculado ao
-repositório GitHub `nessaoana/vehicle-core` no SonarCloud, com a integração do
-GitHub habilitada. O workflow possui `checks: write` e `pull-requests: write`.
+- build e testes, com cobertura mínima de 80%;
+- análise no SonarCloud, que bloqueia a alteração se o quality gate falhar;
+- `terraform fmt`, `validate` e `plan`, sem apply.
 
-Após a conclusão bem-sucedida do workflow `CI` na branch `main`, o workflow de CD usa
-`fiap-soat-grupo36/reusable-actions/.github/workflows/_reusable-dockerhub.yml`
-para publicar a imagem `app` no Docker Hub. Configure `DOCKERHUB_USERNAME` e
-`DOCKERHUB_TOKEN` no GitHub. Use `DOCKERHUB_USERNAME` como repository variable
-e `DOCKERHUB_TOKEN` como secret.
+Se o CI passar:
 
-Depois da publicação da imagem, o mesmo CD executa o deploy Terraform no
-LocalStack Cloud usando
-`fiap-soat-grupo36/reusable-actions/.github/workflows/_reusable-terraform.yml`.
+- **em outra branch**, um PR para `main` é aberto automaticamente;
+- **na `main`**, o CD publica a imagem no Docker Hub e aplica o Terraform no
+  LocalStack Cloud.
 
-Após um CI bem-sucedido em uma branch diferente de `main`,
-o job `create-pr` usa
-`fiap-soat-grupo36/reusable-actions/.github/workflows/_reusable-create-pr.yml`
-para abrir um Pull Request automaticamente contra `main`.
-
-Após o merge de um pull request em `main`, o workflow `cd.yml` publica a imagem
-e executa o `apply` no LocalStack Cloud.
+Os jobs usam os workflows reutilizáveis de `fiap-soat-grupo36/reusable-actions`.
 
 ## Terraform e LocalStack
 
