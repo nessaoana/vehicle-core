@@ -223,3 +223,19 @@ def test_real_app_initializes_database_and_reports_readiness(monkeypatch, tmp_pa
         response = client.get("/health/ready")
 
     assert response.json() == {"status": "ok", "database": "ok"}
+
+
+def test_real_app_starts_without_database_and_endpoints_return_503(monkeypatch, tmp_path) -> None:
+    unreachable = tmp_path / "missing-dir" / "vehicle.db"
+    monkeypatch.setattr(settings, "DATABASE_URL", f"sqlite:///{unreachable}")
+    client = TestClient(create_app())
+
+    with client:
+        health_response = client.get("/health")
+        ready_response = client.get("/health/ready")
+        vehicle_response = client.get("/vehicles/1")
+
+    assert health_response.status_code == 200
+    assert ready_response.json() == {"status": "unavailable", "database": "unavailable"}
+    assert vehicle_response.status_code == 503
+    assert vehicle_response.json() == {"detail": "Database unavailable."}

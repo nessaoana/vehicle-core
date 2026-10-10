@@ -3,8 +3,9 @@
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
-from sqlalchemy import create_engine, inspect, text
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
+from sqlalchemy import Engine, create_engine, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -25,6 +26,22 @@ from src.infra.logging.formatter import LogConfig
 logger = LogConfig(service_name="vehicle-core", environment="local").get_logger()
 
 
+def _prepare_schema(engine: Engine) -> None:
+    """Create missing tables and columns."""
+
+    Base.metadata.create_all(engine)
+    if "vehicles" in inspect(engine).get_table_names():
+        columns = {column["name"] for column in inspect(engine).get_columns("vehicles")}
+        if "price" not in columns:
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "ALTER TABLE vehicles ADD COLUMN price "
+                        "NUMERIC(12, 2) NOT NULL DEFAULT 0"
+                    )
+                )
+
+
 def create_app(repository: VehicleRepository | None = None) -> FastAPI:
     """Create the API with either a real or test repository."""
 
@@ -40,21 +57,22 @@ def create_app(repository: VehicleRepository | None = None) -> FastAPI:
 
         @asynccontextmanager
         async def lifespan(_: FastAPI):
-            Base.metadata.create_all(engine)
-            if "vehicles" in inspect(engine).get_table_names():
-                columns = {column["name"] for column in inspect(engine).get_columns("vehicles")}
-                if "price" not in columns:
-                    with engine.begin() as connection:
-                        connection.execute(
-                            text(
-                                "ALTER TABLE vehicles ADD COLUMN price "
-                                "NUMERIC(12, 2) NOT NULL DEFAULT 0"
-                            )
-                        )
-            logger.info("database_schema_ready")
+            try:
+                _prepare_schema(engine)
+                logger.info("database_schema_ready")
+            except SQLAlchemyError as error:
+                logger.error("database_schema_failed", extra={"error": str(error)})
             yield
 
     app = FastAPI(title="vehicle-core", lifespan=lifespan)
+
+    @app.exception_handler(SQLAlchemyError)
+    async def database_error_handler(_: Request, error: SQLAlchemyError) -> JSONResponse:
+        logger.error("database_request_failed", extra={"error": str(error)})
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"detail": "Database unavailable."},
+        )
 
     @app.get("/health", tags=["health"])
     def health() -> dict[str, str]:
