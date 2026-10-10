@@ -1,19 +1,22 @@
 """HTTP controller for vehicles."""
 
 import logging
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from src.adapters.schemas.vehicle import (
     VehicleAvailabilityRequest,
     VehicleCreateRequest,
     VehicleResponse,
+    VehicleSearchQuery,
     VehicleUpdateRequest,
 )
 from src.application.exceptions.vehicle_exceptions import (
     VehicleAlreadyExistsError,
     VehicleNotFoundError,
 )
+from src.application.interfaces.vehicle_repository import VehicleSearchFilters
 from src.application.use_case.change_vehicle_availability import (
     ChangeVehicleAvailabilityUseCase,
 )
@@ -22,6 +25,7 @@ from src.application.use_case.create_vehicle import (
     CreateVehicleUseCase,
 )
 from src.application.use_case.get_vehicle import GetVehicleUseCase
+from src.application.use_case.search_vehicles import SearchVehiclesUseCase
 from src.application.use_case.update_vehicle import (
     UpdateVehicleInput,
     UpdateVehicleUseCase,
@@ -37,6 +41,7 @@ def create_vehicle_router(
     get_use_case: GetVehicleUseCase,
     update_use_case: UpdateVehicleUseCase,
     availability_use_case: ChangeVehicleAvailabilityUseCase,
+    search_use_case: SearchVehiclesUseCase,
 ) -> APIRouter:
     """Build the vehicle routes with an injected use case."""
 
@@ -81,6 +86,11 @@ def create_vehicle_router(
             extra={"vehicle_id": response.id, "status_code": status.HTTP_201_CREATED},
         )
         return response
+
+    @router.get("")
+    def search_vehicles(filters: Annotated[VehicleSearchQuery, Query()]) -> list[VehicleResponse]:
+        vehicles = search_use_case.execute(VehicleSearchFilters(**filters.model_dump()))
+        return [VehicleResponse.model_validate(vehicle) for vehicle in vehicles]
 
     @router.get("/{vehicle_id}")
     def get_vehicle(vehicle_id: int) -> VehicleResponse:

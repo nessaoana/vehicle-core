@@ -10,6 +10,7 @@ from src.application.exceptions.vehicle_exceptions import (
     VehicleAlreadyExistsError,
     VehicleNotFoundError,
 )
+from src.application.interfaces.vehicle_repository import VehicleSearchFilters
 from src.infra.database.base import Base
 from src.infra.database.repositories.vehicle_repository import (
     SqlAlchemyVehicleRepository,
@@ -109,3 +110,42 @@ def test_sqlalchemy_repository_rejects_duplicate_plate() -> None:
 
     with pytest.raises(VehicleAlreadyExistsError):
         repository.create(duplicate_vehicle)
+
+def test_sqlalchemy_repository_searches_with_filters_ordered_by_price() -> None:
+    repository, _, vehicle_id = repository_with_vehicle()
+    for plate, brand, model, year, price in [
+        ("DEF4G56", "Toyota", "Yaris", 2020, "60000.00"),
+        ("GHI7J89", "Honda", "Civic", 2021, "70000.00"),
+        ("JKL1M23", "Toyota", "Corolla Cross", 2018, "90000.00"),
+    ]:
+        repository.create(
+            VehicleFactory.create(
+                license_plate=plate,
+                brand=brand,
+                model=model,
+                year=year,
+                price=Decimal(price),
+                color=None,
+                notes=None,
+            )
+        )
+    repository.set_availability(vehicle_id, status="sold", active=False)
+
+    everything = repository.search(VehicleSearchFilters())
+    toyota_corolla = repository.search(VehicleSearchFilters(brand="toyota", model="COROLLA"))
+    available_in_range = repository.search(
+        VehicleSearchFilters(status="available", min_year=2019, max_year=2021)
+    )
+    sold = repository.search(VehicleSearchFilters(status="sold"))
+    wildcard = repository.search(VehicleSearchFilters(model="%"))
+
+    assert [vehicle.license_plate for vehicle in everything] == [
+        "DEF4G56",
+        "GHI7J89",
+        "ABC1D23",
+        "JKL1M23",
+    ]
+    assert [vehicle.license_plate for vehicle in toyota_corolla] == ["ABC1D23", "JKL1M23"]
+    assert [vehicle.license_plate for vehicle in available_in_range] == ["DEF4G56", "GHI7J89"]
+    assert [vehicle.license_plate for vehicle in sold] == ["ABC1D23"]
+    assert wildcard == []

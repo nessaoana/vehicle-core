@@ -115,6 +115,15 @@ curl -X PATCH http://127.0.0.1:8081/vehicles/1 \
 	-d '{"price": "82000.00", "model": "Yaris"}'
 ```
 
+Para pesquisar veículos, use `GET /vehicles`. O resultado vem ordenado por
+preço, do mais barato para o mais caro, e todos os filtros são opcionais:
+`status` (`available` ou `sold`), `brand`, `model` (busca parcial, sem
+diferenciar maiúsculas) e o intervalo `min_year`/`max_year`:
+
+```bash
+curl 'http://127.0.0.1:8081/vehicles?status=available&brand=toyota&min_year=2020&max_year=2024'
+```
+
 O serviço de vendas pode atualizar a disponibilidade após a compra por meio do
 endpoint interno:
 

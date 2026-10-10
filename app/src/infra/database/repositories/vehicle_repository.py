@@ -11,6 +11,7 @@ from src.application.exceptions.vehicle_exceptions import (
     VehicleCreationError,
     VehicleNotFoundError,
 )
+from src.application.interfaces.vehicle_repository import VehicleSearchFilters
 from src.domain.entitites.vehicle import Vehicle
 from src.infra.database.mappers.vehicle_mapper import VehicleMapper
 from src.infra.database.models.vehicle import VehicleModel
@@ -95,3 +96,19 @@ class SqlAlchemyVehicleRepository:
             session.commit()
             session.refresh(model)
             return VehicleMapper.to_entity(model)
+
+    def search(self, filters: VehicleSearchFilters) -> list[Vehicle]:
+        with self._session_factory() as session:
+            query = session.query(VehicleModel)
+            if filters.status is not None:
+                query = query.filter(VehicleModel.status == filters.status)
+            if filters.brand:
+                query = query.filter(VehicleModel.brand.icontains(filters.brand, autoescape=True))
+            if filters.model:
+                query = query.filter(VehicleModel.model.icontains(filters.model, autoescape=True))
+            if filters.min_year is not None:
+                query = query.filter(VehicleModel.year >= filters.min_year)
+            if filters.max_year is not None:
+                query = query.filter(VehicleModel.year <= filters.max_year)
+            models = query.order_by(VehicleModel.price.asc(), VehicleModel.id.asc()).all()
+            return [VehicleMapper.to_entity(model) for model in models]

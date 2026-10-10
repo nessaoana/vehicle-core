@@ -14,6 +14,7 @@ from src.application.interfaces.vehicle_repository import VehicleRepository
 from src.application.use_case.change_vehicle_availability import ChangeVehicleAvailabilityUseCase
 from src.application.use_case.create_vehicle import CreateVehicleUseCase
 from src.application.use_case.get_vehicle import GetVehicleUseCase
+from src.application.use_case.search_vehicles import SearchVehiclesUseCase
 from src.application.use_case.update_vehicle import UpdateVehicleUseCase
 from src.infra.database.base import Base
 from src.infra.database.models import vehicle as _vehicle_model  # noqa: F401
@@ -96,6 +97,7 @@ def create_app(repository: VehicleRepository | None = None) -> FastAPI:
             GetVehicleUseCase(repository),
             UpdateVehicleUseCase(repository),
             ChangeVehicleAvailabilityUseCase(repository),
+            SearchVehiclesUseCase(repository),
         )
     )
     return app
