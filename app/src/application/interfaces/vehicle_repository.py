@@ -1,9 +1,21 @@
 """Persistence port for vehicles."""
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Protocol
 
 from src.domain.entitites.vehicle import Vehicle
+
+
+@dataclass(frozen=True)
+class VehicleSearchFilters:
+    """Optional criteria used to search vehicles."""
+
+    status: str | None = None
+    brand: str | None = None
+    model: str | None = None
+    min_year: int | None = None
+    max_year: int | None = None
 
 
 class VehicleRepository(Protocol):
@@ -23,6 +35,9 @@ class VehicleRepository(Protocol):
 
     def set_availability(self, vehicle_id: int, *, status: str, active: bool) -> Vehicle:
         """Change a vehicle availability state."""
+
+    def search(self, filters: VehicleSearchFilters) -> list[Vehicle]:
+        """Return vehicles matching the filters, ordered by price ascending."""
 
 
 VehicleRepositoryFactory = Callable[[], VehicleRepository]

@@ -9,6 +9,7 @@ from src.application.exceptions.vehicle_exceptions import (
     VehicleAlreadyExistsError,
     VehicleNotFoundError,
 )
+from src.application.interfaces.vehicle_repository import VehicleSearchFilters
 from src.domain.entitites.vehicle import Vehicle
 
 
@@ -40,6 +41,18 @@ class InMemoryVehicleRepository:
         vehicle = self.find_by_id(vehicle_id)
         assert vehicle is not None
         return self.update(vehicle.model_copy(update={"status": status, "active": active}))
+
+    def search(self, filters: VehicleSearchFilters) -> list[Vehicle]:
+        matches = [
+            vehicle
+            for vehicle in self.vehicles
+            if (filters.status is None or vehicle.status == filters.status)
+            and (filters.brand is None or filters.brand.lower() in (vehicle.brand or "").lower())
+            and (filters.model is None or filters.model.lower() in vehicle.model.lower())
+            and (filters.min_year is None or vehicle.year >= filters.min_year)
+            and (filters.max_year is None or vehicle.year <= filters.max_year)
+        ]
+        return sorted(matches, key=lambda vehicle: vehicle.price)
 
 
 class ErrorVehicleRepository(InMemoryVehicleRepository):
@@ -201,6 +214,7 @@ def test_controller_maps_domain_validation_errors() -> None:
             UnusedUseCase(),
             RaisingUpdateUseCase(),
             UnusedUseCase(),
+            UnusedUseCase(),
         )
     )
     client = TestClient(app)
@@ -213,6 +227,47 @@ def test_controller_maps_domain_validation_errors() -> None:
 
     assert create_response.status_code == 422
     assert update_response.status_code == 422
+
+
+def test_search_vehicles_endpoint_filters_and_orders_by_price() -> None:
+    client = TestClient(create_app(InMemoryVehicleRepository()))
+    for plate, brand, model, year, price in [
+        ("ABC1D23", "Toyota", "Corolla", 2022, "90000.00"),
+        ("DEF4G56", "Toyota", "Yaris", 2020, "70000.00"),
+        ("GHI7J89", "Honda", "Civic", 2021, "80000.00"),
+        ("JKL1M23", "Toyota", "Corolla Cross", 2018, "60000.00"),
+    ]:
+        client.post(
+            "/vehicles",
+            json={"license_plate": plate, "brand": brand, "model": model, "year": year, "price": price},
+        )
+    client.patch("/vehicles/2/availability", json={"status": "sold", "active": False})
+
+    all_response = client.get("/vehicles")
+    filtered_response = client.get(
+        "/vehicles",
+        params={"status": "available", "brand": "toyota", "model": "corolla", "min_year": 2019, "max_year": 2023},
+    )
+    sold_response = client.get("/vehicles", params={"status": "sold"})
+
+    assert [vehicle["license_plate"] for vehicle in all_response.json()] == [
+        "JKL1M23",
+        "DEF4G56",
+        "GHI7J89",
+        "ABC1D23",
+    ]
+    assert [vehicle["license_plate"] for vehicle in filtered_response.json()] == ["ABC1D23"]
+    assert [vehicle["license_plate"] for vehicle in sold_response.json()] == ["DEF4G56"]
+
+
+def test_search_vehicles_endpoint_rejects_invalid_filters() -> None:
+    client = TestClient(create_app(InMemoryVehicleRepository()))
+
+    inverted_range = client.get("/vehicles", params={"min_year": 2024, "max_year": 2020})
+    unknown_status = client.get("/vehicles", params={"status": "reserved"})
+
+    assert inverted_range.status_code == 422
+    assert unknown_status.status_code == 422
 
 
 def test_real_app_initializes_database_and_reports_readiness(monkeypatch, tmp_path) -> None:

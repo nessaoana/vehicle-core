@@ -3,7 +3,7 @@
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from src.domain.validators.license_plate import normalize_license_plate
 
@@ -73,6 +73,24 @@ class VehicleUpdateRequest(BaseModel):
     @classmethod
     def validate_update_license_plate(cls, value: str | None) -> str | None:
         return normalize_license_plate(value) if value is not None else None
+
+
+class VehicleSearchQuery(BaseModel):
+    """Optional query filters for the vehicle search endpoint."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["available", "sold"] | None = None
+    brand: str | None = Field(default=None, max_length=80)
+    model: str | None = Field(default=None, max_length=80)
+    min_year: int | None = Field(default=None, ge=1886, le=2100)
+    max_year: int | None = Field(default=None, ge=1886, le=2100)
+
+    @model_validator(mode="after")
+    def validate_year_range(self) -> "VehicleSearchQuery":
+        if self.min_year is not None and self.max_year is not None and self.min_year > self.max_year:
+            raise ValueError("min_year must be less than or equal to max_year")
+        return self
 
 
 class VehicleAvailabilityRequest(BaseModel):
