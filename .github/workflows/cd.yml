@@ -17,18 +17,38 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Imagem multi-arquitetura (amd64 para o runner, arm64 para Macs Apple Silicon).
   docker:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    uses: fiap-soat-grupo36/reusable-actions/.github/workflows/_reusable-dockerhub.yml@main
-    with:
-      services_json: '[{"service":"vehicle-core","dockerfile":"./app/Dockerfile"}]'
-      registry_namespace: ${{ vars.DOCKERHUB_USERNAME }}
-      tag_strategy: "both"
-      push_images: true
-      exclude_modules: "[]"
-    secrets:
-      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: SHA curto da tag
+        id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build e push (linux/amd64 e linux/arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./app/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ vars.DOCKERHUB_USERNAME }}/vehicle-core:main
+            ${{ vars.DOCKERHUB_USERNAME }}/vehicle-core:main-${{ steps.sha.outputs.short }}
+          cache-from: type=gha,scope=vehicle-core
+          cache-to: type=gha,mode=max,scope=vehicle-core
 
   deploy:
     needs: docker
@@ -86,6 +106,8 @@ jobs:
       - name: Estado do cluster
         if: always()
         run: |
+          docker ps -a --filter name=vehicle-localstack || true
+          docker logs vehicle-localstack --tail=100 || true
           kubectl get pods,svc,hpa,ingress -A || true
           kubectl -n vehicle-core logs deployment/vehicle-core-api --tail=50 || true
           kubectl -n vehicle-sales logs deployment/vehicle-sales-api --tail=50 || true
