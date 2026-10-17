@@ -86,6 +86,8 @@ jobs:
       - name: Estado do cluster
         if: always()
         run: |
+          docker ps -a --filter name=vehicle-localstack || true
+          docker logs vehicle-localstack --tail=100 || true
           kubectl get pods,svc,hpa,ingress -A || true
           kubectl -n vehicle-core logs deployment/vehicle-core-api --tail=50 || true
           kubectl -n vehicle-sales logs deployment/vehicle-sales-api --tail=50 || true

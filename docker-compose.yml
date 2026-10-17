@@ -56,8 +56,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 15s
+      retries: 20
+      start_period: 30s
 
 volumes:
   postgres_data:
