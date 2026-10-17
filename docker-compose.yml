@@ -43,7 +43,7 @@ services:
       - "4566:4566"
       - "4510-4559:4510-4559"
     environment:
-      SERVICES: ${LOCALSTACK_SERVICES:-eks,iam,ec2,sts,s3,apigateway}
+      SERVICES: ${LOCALSTACK_SERVICES:-eks,iam,ec2,sts,s3,apigateway,apigatewayv2}
       DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
       DEBUG: ${DEBUG:-0}
       LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:-}
