@@ -140,55 +140,119 @@ GET /health       # processo disponível
 GET /health/ready # processo e banco disponíveis
 ```
 
+## Infraestrutura
+
+Os dois serviços rodam num único cluster EKS emulado pelo LocalStack Pro. Cada
+serviço tem seu próprio namespace e seu próprio PostgreSQL, e um API Gateway é
+a única porta de entrada pública.
+
+```mermaid
+flowchart TB
+	Client[Frontend / processador de pagamento] -->|HTTPS + CORS| GW[API Gateway<br/>HTTP API]
+	GW -->|rotas públicas| LB[Load balancer<br/>Traefik Ingress :8081]
+	subgraph EKS[EKS vehicle-cluster]
+		LB --> CoreSvc[Service vehicle-core-api]
+		LB --> SalesSvc[Service vehicle-sales-api]
+		CoreSvc --> CorePods[Pods core<br/>HPA 1–3]
+		SalesSvc --> SalesPods[Pods sales<br/>HPA 2–6]
+		CorePods --> CoreDB[(Postgres<br/>vehicle_core)]
+		SalesPods --> SalesDB[(Postgres<br/>vehicle_sales)]
+		SalesPods -->|HTTP interno| CoreSvc
+	end
+```
+
+Este repositório é dono da infraestrutura compartilhada:
+
+| Caminho | Conteúdo |
+|---|---|
+| [`infra/main.tf`](infra/main.tf) | VPC, subnets, IAM role e o cluster EKS `vehicle-cluster` |
+| [`infra/gateway.tf`](infra/gateway.tf) | API Gateway com CORS, throttling e as rotas públicas |
+| [`k8s/`](k8s/) | Namespace, Postgres (StatefulSet), Deployment, Service, HPA e Ingress do vehicle-core |
+| [`scripts/`](scripts/) | Deploy, kubeconfig, smoke test e teste de carga |
+
+### Rotas públicas
+
+O API Gateway só expõe as rotas abaixo. A rota interna
+`PATCH /vehicles/{id}/availability`, usada pelo vehicle-sales, e os health
+checks não ficam acessíveis por ele.
+
+| Rota | Serviço |
+|---|---|
+| `POST /vehicles`, `GET /vehicles`, `GET /vehicles/{id}`, `PATCH /vehicles/{id}` | vehicle-core |
+| `GET /vehicles/available`, `GET /vehicles/sold` | vehicle-sales |
+| `POST /sales`, `POST /payments/webhook` | vehicle-sales |
+
+A URL base para o frontend sai de `make gateway-url`. As origens liberadas no
+CORS ficam na variável `frontend_origins` do Terraform.
+
+O vehicle-sales chama o vehicle-core direto pelo DNS do cluster
+(`vehicle-core-api.vehicle-core.svc.cluster.local`), sem passar pelo gateway.
+
+### Escalabilidade
+
+- **API Gateway**: limita cada rota a 100 req/s, com rajadas de até 200.
+- **Load balancer**: o Traefik distribui as requisições entre os Services. No
+  EKS real, o mesmo Ingress seria atendido por um ALB.
+- **HPA**: o vehicle-core escala de 1 a 3 pods (CPU 70%), e o vehicle-sales de
+  2 a 6 (CPU 60% ou memória 75%), já que é ele quem recebe os picos de
+  listagem e compra.
+
+### Subindo o ambiente completo
+
+Pré-requisitos: Docker, Terraform, AWS CLI, kubectl, kustomize, jq e um
+`LOCALSTACK_AUTH_TOKEN` (LocalStack Pro) no `.env`. Com o repositório
+`vehicle-sales` clonado ao lado deste:
+
+```bash
+make localstack   # sobe o LocalStack Pro
+make cluster      # Terraform: EKS + API Gateway; configura o kubectl
+make deploy-all   # publica vehicle-core e vehicle-sales
+make smoke-test   # cadastro → compra → webhook → vendidos, pelo gateway
+```
+
+Para ver o autoscaling, rode `kubectl get hpa -A -w` num terminal e
+`make load-test` em outro (requer `hey`).
+
+O cluster não sobrevive a um restart do LocalStack. Depois de reiniciar, rode
+`make cluster` e `make deploy-all` de novo.
+
 ## CI/CD
 
 ```mermaid
 flowchart LR
 	Push[Push ou PR] --> Tests[Build e testes<br/>cobertura ≥ 80%] --> Sonar[SonarCloud]
-	Push --> Plan[Terraform<br/>validate + plan]
+	Push --> Infra[terraform validate<br/>+ kubeconform]
 	Sonar --> Branch{Branch?}
-	Plan --> Branch
+	Infra --> Branch
 	Branch -- outra --> PR[Abre PR para main]
-	Branch -- main --> Docker[Publica imagem<br/>no Docker Hub] --> Apply[Terraform apply<br/>no LocalStack]
+	Branch -- main --> Docker[Publica imagem<br/>no Docker Hub] --> Deploy[EKS no LocalStack<br/>deploy + smoke test]
 ```
 
 O CI roda em pushes para qualquer branch e em PRs para `main`:
 
 - build e testes, com cobertura mínima de 80%;
 - análise no SonarCloud, que bloqueia a alteração se o quality gate falhar;
-- `terraform fmt`, `validate` e `plan`, sem apply.
+- `terraform fmt` e `validate`, e validação dos manifestos com `kubeconform`.
 
 Se o CI passar:
 
 - **em outra branch**, um PR para `main` é aberto automaticamente;
-- **na `main`**, o CD publica a imagem no Docker Hub e aplica o Terraform no
-  LocalStack Cloud.
+- **na `main`**, o CD publica a imagem `vehicle-core:main-<sha>` no Docker Hub,
+  sobe o LocalStack Pro no runner, cria o cluster e o API Gateway, publica o
+  vehicle-core (nova imagem) e o vehicle-sales (`:main`) e roda o smoke test
+  pelo gateway.
 
-Os jobs usam os workflows reutilizáveis de `fiap-soat-grupo36/reusable-actions`.
+Configuração no GitHub:
 
-## Terraform e LocalStack
+| Tipo | Nome | Uso |
+|---|---|---|
+| Secret | `LOCALSTACK_AUTH_TOKEN` | LocalStack Pro (EKS e API Gateway) |
+| Secret | `DOCKERHUB_TOKEN` | Push da imagem |
+| Secret | `CORE_POSTGRES_PASSWORD`, `SALES_POSTGRES_PASSWORD` | Senhas dos bancos (padrão `postgres`) |
+| Variable | `DOCKERHUB_USERNAME` | Namespace das imagens |
+| Variable | `LOCALSTACK_POD` | Opcional: Cloud Pod carregado e salvo a cada deploy |
 
-A configuração Terraform em `infra/` provisiona o bucket S3
-`vehicle-core-assets` e habilita o versionamento. Para fazer o deploy na
-instância local do LocalStack:
-
-```bash
-cd infra
-terraform init
-terraform plan -out=vehicle-core-local.tfplan
-terraform apply vehicle-core-local.tfplan
-```
-
-O endpoint local é `http://localhost:4566`. O workflow
-[`ci.yml`](.github/workflows/ci.yml) inicia o emulador LocalStack Cloud
-autenticado, executa `terraform plan` em pull requests e executa `terraform
-apply` após um merge em `main`.
-
-Esse workflow usa
-`fiap-soat-grupo36/reusable-actions/.github/workflows/_reusable-terraform.yml`.
-
-Configure `LOCALSTACK_AUTH_TOKEN` como secret do repositório ou do ambiente,
-usando um LocalStack CI Auth Token. O token nunca é armazenado no repositório. O
-workflow Terraform usa o proxy oficial `lstk terraform`, fazendo o Terraform
-apontar para o endpoint compatível com AWS do LocalStack em vez de uma conta AWS
-real.
+Cada execução do CD cria o ambiente do zero no runner, então o deploy é
+idempotente. O grupo de `concurrency` evita dois deploys simultâneos no mesmo
+repositório. Entre os dois repositórios não há trava: com `LOCALSTACK_POD`
+ligado, merges simultâneos podem sobrescrever o Cloud Pod um do outro.

@@ -1,0 +1,19 @@
+# Roteado pelo Traefik (load balancer do cluster). O API Gateway encaminha as
+# rotas públicas para cá. As rotas /vehicles/available e /vehicles/sold são do
+# vehicle-sales, cujo Ingress tem prioridade maior que este.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vehicle-core
+spec:
+  ingressClassName: traefik
+  rules:
+    - http:
+        paths:
+          - path: /vehicles
+            pathType: Prefix
+            backend:
+              service:
+                name: vehicle-core-api
+                port:
+                  name: http

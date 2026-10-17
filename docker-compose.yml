@@ -12,8 +12,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      localstack:
-        condition: service_healthy
     restart: unless-stopped
 
   postgres:
@@ -35,21 +33,25 @@ services:
       timeout: 5s
       retries: 5
 
+  # LocalStack Pro com o cluster EKS e o API Gateway (make localstack / make cluster).
+  # Não sobe com o "docker compose up" padrão, que roda só a API e o banco.
   localstack:
-    image: localstack/localstack:latest
-    container_name: vehicle-core-localstack
+    image: localstack/localstack-pro:latest
+    container_name: vehicle-localstack
+    profiles: ["cluster"]
     ports:
-      - "4567:4566"
+      - "4566:4566"
+      - "4510-4559:4510-4559"
     environment:
-      SERVICES: ${LOCALSTACK_SERVICES:-s3}
+      SERVICES: ${LOCALSTACK_SERVICES:-eks,iam,ec2,sts,s3,apigateway}
       DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
       DEBUG: ${DEBUG:-0}
-      PERSISTENCE: ${LOCALSTACK_PERSISTENCE:-1}
-      AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:-}
+      LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - localstack_data:/var/lib/localstack
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./infra/localstack-init:/etc/localstack/init/ready.d
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
       interval: 10s

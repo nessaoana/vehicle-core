@@ -11,6 +11,11 @@ permissions:
   packages: write
   pull-requests: write
 
+# Um deploy por vez no cluster compartilhado.
+concurrency:
+  group: vehicle-cluster
+  cancel-in-progress: false
+
 jobs:
   docker:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
@@ -25,21 +30,66 @@ jobs:
       DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
-  terraform:
+  deploy:
     needs: docker
-    uses: fiap-soat-grupo36/reusable-actions/.github/workflows/_reusable-terraform.yml@main
-    with:
-      workspace: vehicle-core
-      environment: localstack
-      working_directory: ./infra
-      backend_bucket: vehicle-core-terraform-state
-      auto_apply: true
-      localstack_pod: "vehicle-project"
-      terraform_vars: >-
-        {
-          "localstack_endpoint": "http://localhost:4566",
-          "aws_region": "us-east-1",
-          "assets_bucket_name": "vehicle-core-assets"
-        }
-    secrets:
+    runs-on: ubuntu-latest
+    env:
       LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
+      LOCALSTACK_POD: ${{ vars.LOCALSTACK_POD }}
+      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+      CORE_POSTGRES_PASSWORD: ${{ secrets.CORE_POSTGRES_PASSWORD }}
+      SALES_POSTGRES_PASSWORD: ${{ secrets.SALES_POSTGRES_PASSWORD }}
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+    steps:
+      - uses: actions/checkout@v4
+
+      # O vehicle-sales também sobe no cluster para o teste ponta a ponta.
+      - name: Checkout do vehicle-sales
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/vehicle-sales
+          path: vehicle-sales
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Instalar kustomize
+        run: |
+          curl -sSL "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Subir LocalStack Pro
+        run: docker compose --profile cluster up -d --wait localstack
+
+      - name: Carregar Cloud Pod
+        if: ${{ env.LOCALSTACK_POD != '' }}
+        continue-on-error: true
+        run: |
+          pip install --quiet localstack
+          localstack pod load "${LOCALSTACK_POD}"
+
+      - name: Provisionar cluster EKS e API Gateway
+        run: make cluster
+
+      - name: Deploy do vehicle-core
+        run: scripts/deploy.sh "main-${GITHUB_SHA::7}"
+
+      - name: Deploy do vehicle-sales
+        run: vehicle-sales/scripts/deploy.sh main
+
+      - name: Smoke test pelo API Gateway
+        run: make smoke-test
+
+      - name: Estado do cluster
+        if: always()
+        run: |
+          kubectl get pods,svc,hpa,ingress -A || true
+          kubectl -n vehicle-core logs deployment/vehicle-core-api --tail=50 || true
+          kubectl -n vehicle-sales logs deployment/vehicle-sales-api --tail=50 || true
+
+      - name: Salvar Cloud Pod
+        if: ${{ always() && env.LOCALSTACK_POD != '' }}
+        run: localstack pod save "${LOCALSTACK_POD}"

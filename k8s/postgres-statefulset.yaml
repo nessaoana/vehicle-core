@@ -1,0 +1,56 @@
+# Banco exclusivo do vehicle-core. O Secret vehicle-core-db (POSTGRES_USER e
+# POSTGRES_PASSWORD) é criado pelo deploy, fora do Git.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: vehicle-core-db
+  labels:
+    app: vehicle-core-db
+spec:
+  serviceName: vehicle-core-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vehicle-core-db
+  template:
+    metadata:
+      labels:
+        app: vehicle-core-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: vehicle_core
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          envFrom:
+            - secretRef:
+                name: vehicle-core-db
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d vehicle_core"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
