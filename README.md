@@ -200,32 +200,73 @@ O vehicle-sales chama o vehicle-core direto pelo DNS do cluster
 ### Subindo o ambiente completo
 
 Pré-requisitos: Docker, Terraform, AWS CLI, kubectl, kustomize, jq e um
-`LOCALSTACK_AUTH_TOKEN` (LocalStack Pro) no `.env`. Com o repositório
-`vehicle-sales` clonado ao lado deste:
+`LOCALSTACK_AUTH_TOKEN` (LocalStack Pro) no `.env`.
 
 ```bash
 make localstack   # sobe o LocalStack Pro
 make cluster      # Terraform: EKS + API Gateway; configura o kubectl
-make deploy-all   # publica vehicle-core e vehicle-sales
-make smoke-test   # cadastro → compra → webhook → vendidos, pelo gateway
+make deploy       # publica o vehicle-core
+make smoke-test   # cadastro → edição → consulta → busca do core, pelo gateway
+```
+
+O vehicle-sales é publicado pelo próprio repositório, no mesmo cluster
+(`make deploy` lá). Com os dois serviços no ar, o fluxo completo de compra é
+testado com:
+
+```bash
+make e2e-test     # pytest em e2e/: todas as rotas públicas, pelo gateway
+```
+
+Os testes de [`e2e/`](e2e/) percorrem o fluxo completo pelas APIs: cadastram
+veículos, editam, buscam com filtros, compram, confirmam e cancelam o
+pagamento pelo webhook e conferem as listagens. Cada teste usa uma marca
+aleatória, então pode rodar várias vezes no mesmo banco. As URLs vêm de
+variáveis de ambiente:
+
+```bash
+.venv/bin/pytest e2e                                     # Traefik do cluster (localhost:8081)
+E2E_BASE_URL=<url do gateway> .venv/bin/pytest e2e       # API Gateway
+E2E_CORE_URL=http://localhost:8001 \
+E2E_SALES_URL=http://localhost:8000 .venv/bin/pytest e2e # containers do docker compose
 ```
 
 Para ver o autoscaling, rode `kubectl get hpa -A -w` num terminal e
 `make load-test` em outro (requer `hey`).
 
 O cluster não sobrevive a um restart do LocalStack. Depois de reiniciar, rode
-`make cluster` e `make deploy-all` de novo.
+`make cluster` e o `make deploy` de cada serviço de novo.
 
 ## CI/CD
 
 ```mermaid
-flowchart LR
-	Push[Push ou PR] --> Tests[Build e testes<br/>cobertura ≥ 80%] --> Sonar[SonarCloud]
-	Push --> Infra[terraform validate<br/>+ kubeconform]
-	Sonar --> Branch{Branch?}
-	Infra --> Branch
+flowchart TB
+	Push[Push em qualquer branch<br/>ou PR para main]
+
+	subgraph CI[CI · ci.yml]
+		Tests[Testes<br/>cobertura ≥ 80%] --> Sonar[SonarCloud<br/>quality gate]
+		TFCheck[Terraform<br/>fmt + validate]
+		K8sCheck[kubeconform<br/>+ bash -n nos scripts]
+	end
+
+	Push --> Tests
+	Push --> TFCheck
+	Push --> K8sCheck
+	Sonar & TFCheck & K8sCheck --> Branch{Branch?}
 	Branch -- outra --> PR[Abre PR para main]
-	Branch -- main --> Docker[Publica imagem<br/>no Docker Hub] --> Deploy[EKS no LocalStack<br/>deploy + smoke test]
+	PR -. merge .-> Main[main]
+	Branch -- main --> Main
+
+	subgraph CD[CD · cd.yml, após CI verde na main]
+		Docker[Build amd64 + arm64<br/>push vehicle-core:main e :main-sha]
+		Docker --> LS[Sobe LocalStack Pro<br/>no runner]
+		LS --> TFApply[make cluster · terraform apply<br/>VPC, IAM, EKS + node group,<br/>API Gateway]
+		TFApply --> DCore[Deploy vehicle-core<br/>imagem nova]
+		DCore --> Smoke[Smoke test do core<br/>pelo API Gateway]
+	end
+
+	Main --> Docker
+	Docker -. push .-> Hub[(Docker Hub)]
+	Infra[(infra/ · compose · kubeconfig<br/>infraestrutura compartilhada)] -. usada também pelo<br/>CD do vehicle-sales .-> SalesCD[CD vehicle-sales]
 ```
 
 O CI roda em pushes para qualquer branch e em PRs para `main`:
@@ -239,8 +280,27 @@ Se o CI passar:
 - **em outra branch**, um PR para `main` é aberto automaticamente;
 - **na `main`**, o CD publica a imagem `vehicle-core:main-<sha>` no Docker Hub,
   sobe o LocalStack Pro no runner, cria o cluster e o API Gateway, publica o
-  vehicle-core (nova imagem) e o vehicle-sales (`:main`) e roda o smoke test
-  pelo gateway.
+  vehicle-core e roda o smoke test do core pelo gateway.
+
+Os pipelines dos dois serviços são independentes: este CD não publica nem
+testa o vehicle-sales, e o do vehicle-sales não publica o core. O que é
+compartilhado é só a infraestrutura, mantida aqui.
+
+### Onde o Terraform é usado
+
+O código Terraform fica só neste repositório, em [`infra/`](infra/). O
+vehicle-sales usa os mesmos arquivos fazendo checkout do vehicle-core no CD.
+
+| Onde | Comando | O que faz |
+|---|---|---|
+| CI (`infrastructure`) | `terraform fmt -check`, `init -backend=false`, `validate` | Valida sintaxe e formatação, sem criar nada |
+| CD dos dois repositórios | `make cluster` → `terraform init` + `apply` | Cria VPC, subnets, IAM, cluster EKS com node group e API Gateway no LocalStack do runner |
+| Local | `make cluster` / `make destroy` | Cria e remove a mesma infraestrutura no seu LocalStack |
+| Local e CD | `make gateway-url`, `make smoke-test` | Leem a URL do gateway com `terraform output` |
+
+O state fica no bucket S3 `vehicle-terraform-state` do próprio LocalStack. Como
+o LocalStack do runner é descartado no fim do job, cada execução do CD cria a
+infraestrutura do zero.
 
 Configuração no GitHub:
 
@@ -248,7 +308,7 @@ Configuração no GitHub:
 |---|---|---|
 | Secret | `LOCALSTACK_AUTH_TOKEN` | LocalStack Pro (EKS e API Gateway) |
 | Secret | `DOCKERHUB_TOKEN` | Push da imagem |
-| Secret | `CORE_POSTGRES_PASSWORD`, `SALES_POSTGRES_PASSWORD` | Senhas dos bancos (padrão `postgres`) |
+| Secret | `CORE_POSTGRES_PASSWORD` | Senha do banco `vehicle_core` (padrão `postgres`) |
 | Variable | `DOCKERHUB_USERNAME` | Namespace das imagens |
 | Variable | `LOCALSTACK_POD` | Opcional: Cloud Pod carregado e salvo a cada deploy |
 

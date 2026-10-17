@@ -58,19 +58,11 @@ jobs:
       LOCALSTACK_POD: ${{ vars.LOCALSTACK_POD }}
       DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
       CORE_POSTGRES_PASSWORD: ${{ secrets.CORE_POSTGRES_PASSWORD }}
-      SALES_POSTGRES_PASSWORD: ${{ secrets.SALES_POSTGRES_PASSWORD }}
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
       AWS_DEFAULT_REGION: us-east-1
     steps:
       - uses: actions/checkout@v4
-
-      # O vehicle-sales também sobe no cluster para o teste ponta a ponta.
-      - name: Checkout do vehicle-sales
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.repository_owner }}/vehicle-sales
-          path: vehicle-sales
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -97,10 +89,7 @@ jobs:
       - name: Deploy do vehicle-core
         run: scripts/deploy.sh "main-${GITHUB_SHA::7}"
 
-      - name: Deploy do vehicle-sales
-        run: vehicle-sales/scripts/deploy.sh main
-
-      - name: Smoke test pelo API Gateway
+      - name: Smoke test do vehicle-core pelo API Gateway
         run: make smoke-test
 
       - name: Estado do cluster
@@ -110,7 +99,6 @@ jobs:
           docker logs vehicle-localstack --tail=100 || true
           kubectl get pods,svc,hpa,ingress -A || true
           kubectl -n vehicle-core logs deployment/vehicle-core-api --tail=50 || true
-          kubectl -n vehicle-sales logs deployment/vehicle-sales-api --tail=50 || true
 
       - name: Salvar Cloud Pod
         if: ${{ always() && env.LOCALSTACK_POD != '' }}

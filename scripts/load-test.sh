@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Gera carga na listagem de veículos à venda para demonstrar o autoscaling.
+# Gera carga na busca de veículos do vehicle-core para demonstrar o autoscaling.
 # Em outro terminal: kubectl get hpa -A -w
 # Uso: scripts/load-test.sh <api_gateway_url> [duração] [concorrência]
 set -euo pipefail
@@ -13,4 +13,4 @@ if ! command -v hey >/dev/null 2>&1; then
   exit 1
 fi
 
-hey -z "${DURATION}" -c "${CONCURRENCY}" "${BASE_URL%/}/vehicles/available"
+hey -z "${DURATION}" -c "${CONCURRENCY}" "${BASE_URL%/}/vehicles"
