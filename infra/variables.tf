@@ -23,8 +23,38 @@ variable "aws_secret_key" {
   sensitive   = true
 }
 
-variable "assets_bucket_name" {
-  description = "Bucket S3 usado pelo vehicle-core."
+variable "environment" {
+  description = "Nome do ambiente usado nas tags."
   type        = string
-  default     = "vehicle-core-assets"
+  default     = "localstack"
+}
+
+variable "cluster_name" {
+  description = "Nome do cluster EKS compartilhado pelos serviços."
+  type        = string
+  default     = "vehicle-cluster"
+}
+
+variable "ingress_endpoint" {
+  description = "URL do load balancer do Ingress (Traefik) do cluster, vista a partir do container do LocalStack."
+  type        = string
+  default     = "http://host.docker.internal:8081"
+}
+
+variable "frontend_origins" {
+  description = "Origens liberadas no CORS do API Gateway."
+  type        = list(string)
+  default     = ["http://localhost:3000", "http://localhost:5173"]
+}
+
+variable "gateway_rate_limit" {
+  description = "Requisições por segundo permitidas por rota no API Gateway."
+  type        = number
+  default     = 100
+}
+
+variable "gateway_burst_limit" {
+  description = "Rajada máxima de requisições por rota no API Gateway."
+  type        = number
+  default     = 200
 }

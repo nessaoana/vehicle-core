@@ -74,27 +74,21 @@ jobs:
         working-directory: infra
         run: terraform validate
 
-  terraform-plan:
-    needs: infrastructure
-    uses: fiap-soat-grupo36/reusable-actions/.github/workflows/_reusable-terraform.yml@main
-    with:
-      workspace: vehicle-core
-      environment: localstack
-      working_directory: ./infra
-      backend_bucket: vehicle-core-terraform-state
-      auto_apply: false
-      localstack_pod: "vehicle-project"
-      terraform_vars: >-
-        {
-          "localstack_endpoint": "http://localhost:4566",
-          "aws_region": "us-east-1",
-          "assets_bucket_name": "vehicle-core-assets"
-        }
-    secrets:
-      LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
+  kubernetes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz
+          sudo mv kubeconform /usr/local/bin/
+      - name: Validar manifestos Kubernetes
+        run: kubectl kustomize k8s | kubeconform -strict -summary -kubernetes-version 1.30.0
+      - name: Validar scripts de deploy
+        run: bash -n scripts/*.sh
 
   create-pr:
-    needs: [build, coverage-gate, sonar, infrastructure, terraform-plan]
+    needs: [build, coverage-gate, sonar, infrastructure, kubernetes]
     if: ${{ github.event_name == 'push' && github.ref != 'refs/heads/main' }}
     uses: fiap-soat-grupo36/reusable-actions/.github/workflows/_reusable-create-pr.yml@main
     with:
