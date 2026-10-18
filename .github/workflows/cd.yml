@@ -69,9 +69,14 @@ jobs:
           terraform_wrapper: false
 
       - name: Instalar kustomize
+        # Versão fixa direto do release: o install_kustomize.sh consulta a API
+        # do GitHub sem token e falha por rate limit.
+        env:
+          KUSTOMIZE_VERSION: v5.4.3
         run: |
-          curl -sSL "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
-          sudo mv kustomize /usr/local/bin/
+          curl -sSfL --retry 3 "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin kustomize
+          kustomize version
 
       - name: Subir LocalStack Pro
         run: docker compose --profile cluster up -d --wait localstack
